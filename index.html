@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRIGONEL - Control de Refrigeración</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: rgba(255,255,255,0.95);
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .logo-image {
+            height: 40px;
+            width: auto;
+            max-width: 150px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+        
+        .logo-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+        
+        .logo-company {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .logo-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            font-weight: normal;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        .main-content {
+            padding: 2rem 0;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .temperature-display {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .temp-value {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .temp-status {
+            font-size: 1rem;
+            color: #666;
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .control-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .control-item.active::before {
+            background: #28a745;
+        }
+
+        .control-item.inactive::before {
+            background: #dc3545;
+        }
+
+        .control-item.standby::before {
+            background: #ffc107;
+        }
+
+        .control-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #6c757d;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-status 2s infinite;
+        }
+
+        .status-on {
+            background: #28a745;
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+
+        .status-off {
+            background: #dc3545;
+            box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+        }
+
+        .status-standby {
+            background: #ffc107;
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+        }
+
+        @keyframes pulse-status {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+
+        .system-overview {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .system-overview h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .system-overview .main-status {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .input-group input {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 8px;
+            width: 80px;
+            text-align: center;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .footer {
+            background: rgba(255,255,255,0.95);
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            color: #666;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .control-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .system-overview {
+                grid-column: 1 / -1;
+                padding: 15px;
+            }
+            .control-item {
+                padding: 12px;
+            }
+            .control-label {
+                font-size: 0.75rem;
+            }
+            .chart-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <!-- Logo de FRIGONEL desde Google Drive -->
+                    <img src="https://drive.google.com/uc?export=view&id=1STKjB1yDzwiAnV36MaQZH24Mhr54Eqwg" 
+                         alt="FRIGONEL Logo" class="logo-image" 
+                         onerror="this.style.display='none'; document.querySelector('.logo-fallback').style.display='flex';">
+                    
+                    <!-- Logo temporal con CSS (backup) -->
+                    <div class="logo-fallback" style="display: none;">
+                        <i class="fas fa-snowflake"></i>
+                    </div>
+                    
+                    <div class="logo-text">
+                        <span class="logo-company">FRIGONEL</span>
+                        <span class="logo-subtitle">Sistemas de Refrigeración</span>
+                    </div>
+                </div>
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>Sistema Conectado</span>
+                    <span id="currentTime">--:--</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="grid">
+                <!-- Temperatura Actual -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-thermometer-half"></i>
+                        Temperatura Actual
+                    </div>
+                    <div class="temperature-display">
+                        <div class="temp-value" id="currentTemp">--</div>
+                        <div class="temp-status" id="tempStatus">Cargando...</div>
+                    </div>
+                </div>
+
+                <!-- Estado del Sistema -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-cogs"></i>
+                        Estado del Sistema
+                    </div>
+                    <div class="control-grid">
+                        <div class="system-overview">
+                            <h3>Estado General</h3>
+                            <div class="main-status" id="systemState">Cargando...</div>
+                        </div>
+                        
+                        <div class="control-item" id="compressorItem">
+                            <div class="control-label">
+                                <i class="fas fa-compress-alt"></i> Compresor
+                            </div>
+                            <div class="control-status">
+                                <span class="status-icon status-off" id="compIcon"></span>
+                                <span id="compStatus">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-item" id="fanItem">
+                            <div class="control-label">
+                                <i class="fas fa-fan"></i> Ventilador
+                            </div>
+                            <div class="control-status">
+                                <span class="status-icon status-off" id="fanIcon"></span>
+                                <span id="fanStatus">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-item" id="heaterItem">
+                            <div class="control-label">
+                                <i class="fas fa-fire"></i> Resistencia
+                            </div>
+                            <div class="control-status">
+                                <span class="status-icon status-off" id="heaterIcon"></span>
+                                <span id="heaterStatus">--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-item" id="connectionItem">
+                            <div class="control-label">
+                                <i class="fas fa-wifi"></i> Conexión
+                            </div>
+                            <div class="control-status">
+                                <span class="status-icon status-on" id="connectionIcon"></span>
+                                <span id="connectionStatus">Conectado</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controles Manuales -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-sliders-h"></i>
+                        Controles Manuales
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="btn btn-warning" onclick="sendCommand('toff')">
+                            <i class="fas fa-pause"></i> Modo OFF Temporal
+                        </button>
+                        <button class="btn btn-success" onclick="sendCommand('modoon')">
+                            <i class="fas fa-play"></i> Activar Modo Normal
+                        </button>
+                        <button class="btn btn-danger" onclick="sendCommand('permoff')">
+                            <i class="fas fa-stop"></i> Apagado Permanente
+                        </button>
+                        <div class="input-group">
+                            <input type="number" id="dsxtTime" placeholder="10" min="1" max="999">
+                            <button class="btn" onclick="startDsxt()">
+                                <i class="fas fa-fire"></i> Descongelar X Tiempo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parámetros -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-wrench"></i>
+                        Parámetros del Sistema
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div class="input-group">
+                            <label>Umbral:</label>
+                            <input type="number" id="umbral" step="0.1">
+                            <button class="btn" onclick="setParameter('umbral')">Cambiar</button>
+                        </div>
+                        <div class="input-group">
+                            <label>Temp Mín:</label>
+                            <input type="number" id="tempMin" step="0.1">
+                            <button class="btn" onclick="setParameter('tempmin')">Cambiar</button>
+                        </div>
+                        <div class="input-group">
+                            <label>Tiempo Espera:</label>
+                            <input type="number" id="tiempoEspera">
+                            <button class="btn" onclick="setParameter('tiempoespera')">Cambiar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Programación de Horarios -->
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-clock"></i>
+                        Programación de Horarios
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <div class="input-group">
+                            <label>Hora Inicio:</label>
+                            <input type="time" id="horaInicio">
+                            <label>Hora Fin:</label>
+                            <input type="time" id="horaFin">
+                        </div>
+                        <div class="input-group">
+                            <label>Días:</label>
+                            <select id="diasSemana" multiple style="width: 150px;">
+                                <option value="L">Lunes</option>
+                                <option value="M">Martes</option>
+                                <option value="X">Miércoles</option>
+                                <option value="J">Jueves</option>
+                                <option value="V">Viernes</option>
+                                <option value="S">Sábado</option>
+                                <option value="D">Domingo</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-success" onclick="agregarHorario()">
+                            <i class="fas fa-plus"></i> Agregar Horario
+                        </button>
+                        <button class="btn btn-warning" onclick="toggleProgramacion()" id="progBtn">
+                            <i class="fas fa-calendar"></i> Ver Programación
+                        </button>
+                        <div id="horariosContainer" style="display:none;">
+                            <div id="horariosContent">Cargando horarios...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="chart-container">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    Monitoreo de Temperatura
+                </div>
+                <div class="chart-controls">
+                    <button class="btn" onclick="toggleChart()" id="chartBtn">
+                        <i class="fas fa-chart-area"></i> Mostrar Gráfica
+                    </button>
+                    <button class="btn btn-success" onclick="toggleHistoricos()" id="histBtn">
+                        <i class="fas fa-history"></i> Ver Históricos
+                    </button>
+                    <button class="btn btn-warning" onclick="loadChart()">
+                        <i class="fas fa-sync"></i> Actualizar
+                    </button>
+                </div>
+                <div id="chartContainer" style="display:none;">
+                    <canvas id="tempChart" width="800" height="400"></canvas>
+                </div>
+                <div id="histContainer" style="display:none;">
+                    <div id="histContent">Cargando históricos...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2025 FRIGONEL SAS - Sistema de Control de Refrigeración</p>
+            <p>Desarrollado por Julian Castel - Acceso vía: <strong>frigonel.mywire.org</strong></p>
+            <p>ESP32 Interno: 192.168.3.158 | Servidor: Ubuntu</p>
+        </div>
+    </footer>
+
+    <script>
+        const ESP32_API = '/api'; // A través del proxy de Nginx
+        let chart = null;
+        let updateInterval = null;
+
+        // Función principal de actualización
+        async function updateStatus() {
+            try {
+                const response = await fetch(`${ESP32_API}/status`);
+                const data = await response.json();
+                
+                // Actualizar temperatura
+                document.getElementById('currentTemp').textContent = data.temperatura + '°C';
+                document.getElementById('tempStatus').textContent = `Estado: ${data.estado}`;
+                
+                // Actualizar estados con indicadores visuales
+                updateComponentStatus('compStatus', 'compIcon', 'compressorItem', data.compresor);
+                updateComponentStatus('fanStatus', 'fanIcon', 'fanItem', data.ventilador);
+                updateComponentStatus('heaterStatus', 'heaterIcon', 'heaterItem', data.resistencia);
+                
+                // Actualizar estado general del sistema
+                document.getElementById('systemState').textContent = data.estado;
+                
+                // Actualizar hora
+                document.getElementById('currentTime').textContent = data.hora;
+                
+                // Actualizar campos de parámetros
+                document.getElementById('umbral').value = data.umbral;
+                document.getElementById('tempMin').value = data.tempMin;
+                document.getElementById('tiempoEspera').value = data.tiempoEspera;
+                
+                // Actualizar indicador de conexión
+                updateConnectionStatus(true);
+                
+            } catch (error) {
+                console.error('Error actualizando estado:', error);
+                document.getElementById('currentTemp').textContent = 'Error';
+                document.getElementById('tempStatus').textContent = 'Sin conexión';
+                
+                // Actualizar indicador de conexión como desconectado
+                updateConnectionStatus(false);
+            }
+        }
+
+        // Función para actualizar el estado visual de los componentes
+        function updateComponentStatus(statusId, iconId, itemId, status) {
+            const statusElement = document.getElementById(statusId);
+            const iconElement = document.getElementById(iconId);
+            const itemElement = document.getElementById(itemId);
+            
+            statusElement.textContent = status;
+            
+            // Limpiar clases anteriores
+            iconElement.className = 'status-icon';
+            itemElement.className = 'control-item';
+            
+            // Aplicar nuevas clases según el estado
+            if (status.toLowerCase().includes('on') || status.toLowerCase().includes('encendido') || status.toLowerCase().includes('activo')) {
+                iconElement.classList.add('status-on');
+                itemElement.classList.add('active');
+            } else if (status.toLowerCase().includes('off') || status.toLowerCase().includes('apagado') || status.toLowerCase().includes('inactivo')) {
+                iconElement.classList.add('status-off');
+                itemElement.classList.add('inactive');
+            } else {
+                iconElement.classList.add('status-standby');
+                itemElement.classList.add('standby');
+            }
+        }
+
+        // Función para actualizar el estado de conexión
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const iconElement = document.getElementById('connectionIcon');
+            const itemElement = document.getElementById('connectionItem');
+            
+            if (connected) {
+                statusElement.textContent = 'Conectado';
+                iconElement.className = 'status-icon status-on';
+                itemElement.className = 'control-item active';
+            } else {
+                statusElement.textContent = 'Desconectado';
+                iconElement.className = 'status-icon status-off';
+                itemElement.className = 'control-item inactive';
+            }
+        }
+
+        // Enviar comandos
+        async function sendCommand(command) {
+            try {
+                const response = await fetch(`${ESP32_API}/set`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Comando ejecutado correctamente');
+                } else {
+                    alert('❌ Error: ' + result.message);
+                }
+                
+                updateStatus();
+            } catch (error) {
+                alert('❌ Error de conexión');
+            }
+        }
+
+        // Descongelar por tiempo
+        function startDsxt() {
+            const time = document.getElementById('dsxtTime').value;
+            if (time && time > 0) {
+                sendCommand(`desc ${time}`);
+            } else {
+                alert('Ingrese un tiempo válido');
+            }
+        }
+
+        // Cambiar parámetros
+        async function setParameter(param) {
+            const value = document.getElementById(param).value;
+            if (value !== '') {
+                let command = '';
+                switch(param) {
+                    case 'umbral': command = `u ${value}`; break;
+                    case 'tempMin': command = `tm ${value}`; break;
+                    case 'tiempoEspera': command = `te ${value}`; break;
+                    default: command = `${param} ${value}`;
+                }
+                await sendCommand(command);
+            }
+        }
+
+        // Programación de horarios
+        async function agregarHorario() {
+            const inicio = document.getElementById('horaInicio').value;
+            const fin = document.getElementById('horaFin').value;
+            const diasSelect = document.getElementById('diasSemana');
+            const dias = Array.from(diasSelect.selectedOptions).map(option => option.value).join('');
+            
+            if (inicio && fin && dias) {
+                const command = `horario ${inicio} ${fin} ${dias}`;
+                await sendCommand(command);
+                // Limpiar campos
+                document.getElementById('horaInicio').value = '';
+                document.getElementById('horaFin').value = '';
+                diasSelect.selectedIndex = -1;
+            } else {
+                alert('Complete todos los campos para agregar el horario');
+            }
+        }
+
+        async function toggleProgramacion() {
+            const container = document.getElementById('horariosContainer');
+            const btn = document.getElementById('progBtn');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-calendar"></i> Ocultar Programación';
+                
+                try {
+                    const response = await fetch(`${ESP32_API}/horarios`);
+                    const data = await response.json();
+                    
+                    let html = '<div style="margin:20px 0;"><h4>Horarios Programados:</h4>';
+                    if (data.horarios && data.horarios.length > 0) {
+                        html += '<table style="width:100%;border-collapse:collapse;">';
+                        html += '<tr style="background:#f8f9fa;"><th style="padding:8px;border:1px solid #ddd;">Inicio</th><th style="padding:8px;border:1px solid #ddd;">Fin</th><th style="padding:8px;border:1px solid #ddd;">Días</th><th style="padding:8px;border:1px solid #ddd;">Acción</th></tr>';
+                        
+                        data.horarios.forEach((horario, index) => {
+                            html += `<tr>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.inicio}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.fin}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.dias}</td>
+                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
+                                    <button class="btn btn-danger" onclick="eliminarHorario(${index})" style="padding:4px 8px;font-size:0.8rem;">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </td>
+                            </tr>`;
+                        });
+                        html += '</table>';
+                    } else {
+                        html += '<p>No hay horarios programados</p>';
+                    }
+                    
+                    html += '<div style="margin-top:15px;">';
+                    html += `<button class="btn ${data.programacionActiva ? 'btn-danger' : 'btn-success'}" onclick="toggleActivarProgramacion()">`;
+                    html += `<i class="fas fa-power-off"></i> ${data.programacionActiva ? 'Desactivar' : 'Activar'} Programación`;
+                    html += '</button>';
+                    html += '</div></div>';
+                    
+                    document.getElementById('horariosContent').innerHTML = html;
+                } catch (error) {
+                    document.getElementById('horariosContent').innerHTML = '<p>Error cargando horarios</p>';
+                }
+            } else {
+                container.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-calendar"></i> Ver Programación';
+            }
+        }
+
+        async function eliminarHorario(index) {
+            if (confirm('¿Eliminar este horario?')) {
+                await sendCommand(`eliminar_horario ${index}`);
+                toggleProgramacion(); // Refrescar la lista
+            }
+        }
+
+        async function toggleActivarProgramacion() {
+            try {
+                const response = await fetch(`${ESP32_API}/programacion`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toggle: true })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Programación actualizada');
+                    toggleProgramacion(); // Refrescar
+                } else {
+                    alert('❌ Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('❌ Error de conexión');
+            }
+        }
+
+        // Gráficos
+        async function loadChart() {
+            try {
+                const response = await fetch(`${ESP32_API}/chart`);
+                const data = await response.json();
+                
+                if (data.datos.length === 0) {
+                    document.getElementById('chartContainer').innerHTML = 
+                        '<p style="text-align:center;padding:50px;">No hay datos disponibles</p>';
+                    return;
+                }
+
+                const ctx = document.getElementById('tempChart').getContext('2d');
+                
+                if (chart) chart.destroy();
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.datos.map(d => d.hora || '--:--'),
+                        datasets: [{
+                            label: 'Temperatura °C',
+                            data: data.datos.map(d => d.temperatura),
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }, {
+                            label: 'Umbral',
+                            data: Array(data.datos.length).fill(data.umbral),
+                            borderColor: '#dc3545',
+                            borderDash: [5, 5],
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Temperatura - Últimas 4 Horas'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    afterLabel: function(context) {
+                                        const index = context.dataIndex;
+                                        const estado = data.datos[index]?.estadoTexto || 'N/A';
+                                        return `Estado: ${estado}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Temperatura (°C)'
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error cargando gráfico:', error);
+            }
+        }
+
+        function toggleChart() {
+            const container = document.getElementById('chartContainer');
+            const btn = document.getElementById('chartBtn');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-chart-area"></i> Ocultar Gráfica';
+                loadChart();
+            } else {
+                container.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-chart-area"></i> Mostrar Gráfica';
+            }
+        }
+
+        async function toggleHistoricos() {
+            const container = document.getElementById('histContainer');
+            const btn = document.getElementById('histBtn');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                btn.innerHTML = '<i class="fas fa-history"></i> Ocultar Históricos';
+                
+                try {
+                    const response = await fetch(`${ESP32_API}/chart`);
+                    const data = await response.json();
+                    
+                    let html = '<table style="width:100%;border-collapse:collapse;margin:20px 0;">';
+                    html += '<tr style="background:#f8f9fa;"><th style="padding:10px;border:1px solid #ddd;">Hora</th><th style="padding:10px;border:1px solid #ddd;">Temperatura</th><th style="padding:10px;border:1px solid #ddd;">Estado</th></tr>';
+                    
+                    data.datos.forEach(punto => {
+                        html += `<tr>
+                            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${punto.hora || '--:--'}</td>
+                            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${punto.temperatura.toFixed(1)}°C</td>
+                            <td style="padding:8px;border:1px solid #ddd;text-align:center;">${punto.estadoTexto || 'N/A'}</td>
+                        </tr>`;
+                    });
+                    
+                    html += '</table>';
+                    document.getElementById('histContent').innerHTML = html;
+                } catch (error) {
+                    document.getElementById('histContent').innerHTML = '<p>Error cargando históricos</p>';
+                }
+            } else {
+                container.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-history"></i> Ver Históricos';
+            }
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus();
+            updateInterval = setInterval(updateStatus, 5000);
+        });
+
+        // Limpieza al cerrar
+        window.addEventListener('beforeunload', function() {
+            if (updateInterval) clearInterval(updateInterval);
+        });
+    </script>
+</body>
+</html>
