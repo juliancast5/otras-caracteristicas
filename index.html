@@ -521,13 +521,13 @@
                     <div style="display: flex; flex-direction: column; gap: 15px;">
                         <div class="input-group">
                             <label>Hora Inicio:</label>
-                            <input type="time" id="horaInicio">
+                            <input type="time" id="horaInicio" style="width: 120px;">
                             <label>Hora Fin:</label>
-                            <input type="time" id="horaFin">
+                            <input type="time" id="horaFin" style="width: 120px;">
                         </div>
                         <div class="input-group">
                             <label>Días:</label>
-                            <select id="diasSemana" multiple style="width: 150px;">
+                            <select id="diasSemana" multiple style="width: 180px; height: 100px;">
                                 <option value="L">Lunes</option>
                                 <option value="M">Martes</option>
                                 <option value="X">Miércoles</option>
@@ -536,6 +536,9 @@
                                 <option value="S">Sábado</option>
                                 <option value="D">Domingo</option>
                             </select>
+                            <div style="font-size: 0.8rem; color: #666; margin-left: 10px;">
+                                <i class="fas fa-info-circle"></i> Mantén Ctrl presionado<br>para seleccionar múltiples días
+                            </div>
                         </div>
                         <button class="btn btn-success" onclick="agregarHorario()">
                             <i class="fas fa-plus"></i> Agregar Horario
@@ -725,15 +728,36 @@
             const diasSelect = document.getElementById('diasSemana');
             const dias = Array.from(diasSelect.selectedOptions).map(option => option.value).join('');
             
-            if (inicio && fin && dias) {
+            // Validación mejorada
+            if (!inicio || !fin || !dias) {
+                alert('⚠️ Complete todos los campos para agregar el horario');
+                return;
+            }
+            
+            // Validar que hora fin sea mayor que hora inicio
+            if (inicio >= fin) {
+                alert('⚠️ La hora de fin debe ser mayor que la hora de inicio');
+                return;
+            }
+            
+            try {
                 const command = `horario ${inicio} ${fin} ${dias}`;
                 await sendCommand(command);
-                // Limpiar campos
+                
+                // Limpiar campos solo si el comando fue exitoso
                 document.getElementById('horaInicio').value = '';
                 document.getElementById('horaFin').value = '';
                 diasSelect.selectedIndex = -1;
-            } else {
-                alert('Complete todos los campos para agregar el horario');
+                
+                // Refrescar la lista si está visible
+                const container = document.getElementById('horariosContainer');
+                if (container.style.display !== 'none') {
+                    setTimeout(() => toggleProgramacion(), 1000); // Dar tiempo para que se guarde
+                }
+                
+            } catch (error) {
+                console.error('Error agregando horario:', error);
+                alert('❌ Error al agregar horario');
             }
         }
 
@@ -746,21 +770,30 @@
                 btn.innerHTML = '<i class="fas fa-calendar"></i> Ocultar Programación';
                 
                 try {
+                    // Mostrar loading
+                    document.getElementById('horariosContent').innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin"></i> Cargando horarios...</div>';
+                    
                     const response = await fetch(`${ESP32_API}/horarios`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
                     const data = await response.json();
                     
                     let html = '<div style="margin:20px 0;"><h4>Horarios Programados:</h4>';
+                    
                     if (data.horarios && data.horarios.length > 0) {
-                        html += '<table style="width:100%;border-collapse:collapse;">';
-                        html += '<tr style="background:#f8f9fa;"><th style="padding:8px;border:1px solid #ddd;">Inicio</th><th style="padding:8px;border:1px solid #ddd;">Fin</th><th style="padding:8px;border:1px solid #ddd;">Días</th><th style="padding:8px;border:1px solid #ddd;">Acción</th></tr>';
+                        html += '<table style="width:100%;border-collapse:collapse;margin:10px 0;">';
+                        html += '<tr style="background:#f8f9fa;"><th style="padding:10px;border:1px solid #ddd;">Inicio</th><th style="padding:10px;border:1px solid #ddd;">Fin</th><th style="padding:10px;border:1px solid #ddd;">Días</th><th style="padding:10px;border:1px solid #ddd;">Acción</th></tr>';
                         
                         data.horarios.forEach((horario, index) => {
                             html += `<tr>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.inicio}</td>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.fin}</td>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">${horario.dias}</td>
-                                <td style="padding:8px;border:1px solid #ddd;text-align:center;">
-                                    <button class="btn btn-danger" onclick="eliminarHorario(${index})" style="padding:4px 8px;font-size:0.8rem;">
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">${horario.inicio || '--:--'}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">${horario.fin || '--:--'}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">${horario.dias || 'N/A'}</td>
+                                <td style="padding:10px;border:1px solid #ddd;text-align:center;">
+                                    <button class="btn btn-danger" onclick="eliminarHorario(${index})" style="padding:6px 12px;font-size:0.8rem;">
                                         <i class="fas fa-trash"></i> Eliminar
                                     </button>
                                 </td>
@@ -768,18 +801,20 @@
                         });
                         html += '</table>';
                     } else {
-                        html += '<p>No hay horarios programados</p>';
+                        html += '<div style="text-align:center;padding:20px;color:#666;"><i class="fas fa-calendar-times"></i><br>No hay horarios programados</div>';
                     }
                     
-                    html += '<div style="margin-top:15px;">';
+                    html += '<div style="margin-top:20px;text-align:center;">';
                     html += `<button class="btn ${data.programacionActiva ? 'btn-danger' : 'btn-success'}" onclick="toggleActivarProgramacion()">`;
                     html += `<i class="fas fa-power-off"></i> ${data.programacionActiva ? 'Desactivar' : 'Activar'} Programación`;
                     html += '</button>';
                     html += '</div></div>';
                     
                     document.getElementById('horariosContent').innerHTML = html;
+                    
                 } catch (error) {
-                    document.getElementById('horariosContent').innerHTML = '<p>Error cargando horarios</p>';
+                    console.error('Error cargando horarios:', error);
+                    document.getElementById('horariosContent').innerHTML = '<div style="text-align:center;padding:20px;color:#dc3545;"><i class="fas fa-exclamation-triangle"></i><br>Error cargando horarios. Verifique la conexión.</div>';
                 }
             } else {
                 container.style.display = 'none';
@@ -788,9 +823,22 @@
         }
 
         async function eliminarHorario(index) {
-            if (confirm('¿Eliminar este horario?')) {
-                await sendCommand(`eliminar_horario ${index}`);
-                toggleProgramacion(); // Refrescar la lista
+            if (confirm('¿Estás seguro de eliminar este horario?')) {
+                try {
+                    await sendCommand(`eliminar_horario ${index}`);
+                    // Refrescar la lista después de eliminar
+                    setTimeout(() => {
+                        // Solo refrescar si el contenedor está visible
+                        const container = document.getElementById('horariosContainer');
+                        if (container.style.display !== 'none') {
+                            toggleProgramacion(); // Cerrar
+                            setTimeout(() => toggleProgramacion(), 500); // Abrir de nuevo
+                        }
+                    }, 1000);
+                } catch (error) {
+                    console.error('Error eliminando horario:', error);
+                    alert('❌ Error al eliminar horario');
+                }
             }
         }
 
@@ -801,16 +849,26 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ toggle: true })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('✅ Programación actualizada');
-                    toggleProgramacion(); // Refrescar
+                    alert('✅ Programación actualizada correctamente');
+                    // Refrescar la vista
+                    setTimeout(() => {
+                        toggleProgramacion(); // Cerrar
+                        setTimeout(() => toggleProgramacion(), 500); // Abrir
+                    }, 1000);
                 } else {
-                    alert('❌ Error: ' + result.message);
+                    alert('❌ Error: ' + (result.message || 'Error desconocido'));
                 }
             } catch (error) {
-                alert('❌ Error de conexión');
+                console.error('Error toggle programación:', error);
+                alert('❌ Error de conexión al cambiar programación');
             }
         }
 
